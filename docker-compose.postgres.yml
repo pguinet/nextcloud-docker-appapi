@@ -25,7 +25,7 @@ services:
   # Nextcloud - Application principale
   # ===========================================
   nextcloud:
-    image: nextcloud:${NEXTCLOUD_VERSION:-30}-apache
+    image: nextcloud:${NEXTCLOUD_VERSION:-32}-apache
     container_name: nextcloud-app
     restart: unless-stopped
     depends_on:
@@ -61,7 +61,7 @@ services:
       - PHP_UPLOAD_LIMIT=${PHP_UPLOAD_LIMIT:-10G}
     volumes:
       - nextcloud_html:/var/www/html
-      - ./data/nextcloud:/var/www/html/data
+      - ${DATA_PATH:-./data}/nextcloud:/var/www/html/data
     networks:
       - frontend
       - backend
@@ -78,7 +78,7 @@ services:
       - POSTGRES_USER=${POSTGRES_USER:-nextcloud}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
     volumes:
-      - ./data/db:/var/lib/postgresql/data
+      - ${DATA_PATH:-./data}/db:/var/lib/postgresql/data
     networks:
       - backend
     healthcheck:
@@ -96,7 +96,7 @@ services:
     restart: unless-stopped
     command: redis-server --save 60 1 --loglevel warning
     volumes:
-      - ./data/redis:/data
+      - ${DATA_PATH:-./data}/redis:/data
     networks:
       - backend
     healthcheck:
@@ -109,7 +109,7 @@ services:
   # Cron - Tâches planifiées
   # ===========================================
   cron:
-    image: nextcloud:${NEXTCLOUD_VERSION:-30}-apache
+    image: nextcloud:${NEXTCLOUD_VERSION:-32}-apache
     container_name: nextcloud-cron
     restart: unless-stopped
     depends_on:
@@ -117,7 +117,7 @@ services:
     entrypoint: /cron.sh
     volumes:
       - nextcloud_html:/var/www/html
-      - ./data/nextcloud:/var/www/html/data
+      - ${DATA_PATH:-./data}/nextcloud:/var/www/html/data
     networks:
       - backend
 

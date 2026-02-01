@@ -1,0 +1,51 @@
+# Configuration Caddy pour Nextcloud
+# SSL automatique via Let's Encrypt
+
+{$NEXTCLOUD_DOMAIN} {
+    # Reverse proxy vers Nextcloud
+    reverse_proxy nextcloud:80
+
+    # Headers de sécurité
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "SAMEORIGIN"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        X-XSS-Protection "1; mode=block"
+        # Supprimer le header Server
+        -Server
+    }
+
+    # Redirections WebDAV/CalDAV/CardDAV
+    redir /.well-known/carddav /remote.php/dav/ 301
+    redir /.well-known/caldav /remote.php/dav/ 301
+    redir /.well-known/webfinger /index.php/.well-known/webfinger 301
+    redir /.well-known/nodeinfo /index.php/.well-known/nodeinfo 301
+
+    # Bloquer l'accès aux fichiers sensibles
+    @forbidden {
+        path /.htaccess
+        path /data/*
+        path /config/*
+        path /db_structure
+        path /.xml
+        path /README
+        path /3rdparty/*
+        path /lib/*
+        path /templates/*
+        path /occ
+        path /console.php
+    }
+    respond @forbidden 404
+
+    # Compression
+    encode gzip zstd
+
+    # Logs
+    log {
+        output file /data/logs/nextcloud.log {
+            roll_size 10mb
+            roll_keep 5
+        }
+    }
+}

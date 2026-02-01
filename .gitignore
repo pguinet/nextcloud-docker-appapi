@@ -1,0 +1,25 @@
+# Fichiers d'environnement avec secrets
+.env
+
+# Données locales
+data/
+
+# Logs
+*.log
+logs/
+
+# Fichiers système
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Backups locaux
+backups/
+*.tar.gz
+*.sql

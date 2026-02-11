@@ -110,9 +110,11 @@ All `data/` and `backups/` directories are gitignored.
 After Nextcloud is running, configure the AppAPI daemon with HaRP:
 
 ```bash
+# IMPORTANT : nc-url doit être l'URL publique (passant par Caddy → HaRP),
+# et non l'URL interne http://nextcloud (sinon les heartbeat ExApps échouent en 404).
 docker compose exec -u www-data nextcloud php occ app_api:daemon:register \
   docker-local "Docker Local" docker-install \
-  http appapi-harp:8780 http://nextcloud \
+  http appapi-harp:8780 "https://${NEXTCLOUD_DOMAIN}" \
   --net nextcloud_backend \
   --harp \
   --harp_frp_address appapi-harp:8782 \

@@ -2,6 +2,13 @@
 # SSL automatique via Let's Encrypt
 
 {$NEXTCLOUD_DOMAIN} {
+    # Reverse proxy ExApps via HaRP (sans passer par PHP)
+    reverse_proxy /exapps/* appapi-harp:8780 {
+        transport http {
+            read_timeout 1800s
+        }
+    }
+
     # Reverse proxy vers Nextcloud
     reverse_proxy nextcloud:80
 

@@ -48,7 +48,7 @@ services:
 
       # Configuration Nextcloud
       - NEXTCLOUD_TRUSTED_DOMAINS=${NEXTCLOUD_DOMAIN}
-      - TRUSTED_PROXIES=caddy
+      - TRUSTED_PROXIES=172.19.0.0/16
       - OVERWRITEPROTOCOL=https
       - OVERWRITECLIURL=https://${NEXTCLOUD_DOMAIN}
       - OVERWRITEHOST=${NEXTCLOUD_DOMAIN}

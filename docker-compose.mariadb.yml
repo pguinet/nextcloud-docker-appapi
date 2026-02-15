@@ -27,6 +27,7 @@ services:
   # ===========================================
   nextcloud:
     image: nextcloud:${NEXTCLOUD_VERSION:-32}-apache
+    pull_policy: always
     container_name: nextcloud-app
     restart: unless-stopped
     depends_on:
@@ -63,6 +64,7 @@ services:
     volumes:
       - nextcloud_html:/var/www/html
       - ${DATA_PATH:-./data}/nextcloud:/var/www/html/data
+      - /data/nextcloud/hooks/install-ffmpeg.sh:/docker-entrypoint-hooks.d/before-starting/install-ffmpeg.sh
     networks:
       - frontend
       - backend
@@ -112,17 +114,20 @@ services:
   # Cron - Tâches planifiées
   # ===========================================
   cron:
-    image: nextcloud:${NEXTCLOUD_VERSION:-32}-apache
-    container_name: nextcloud-cron
-    restart: unless-stopped
-    depends_on:
-      - nextcloud
-    entrypoint: /cron.sh
-    volumes:
-      - nextcloud_html:/var/www/html
-      - ${DATA_PATH:-./data}/nextcloud:/var/www/html/data
-    networks:
-      - backend
+      image: nextcloud:${NEXTCLOUD_VERSION:-32}-apache
+      container_name: nextcloud-cron
+      restart: unless-stopped
+      depends_on:
+        - nextcloud
+      entrypoint: /bin/bash
+      command: /custom-hooks/cron-custom.sh
+      volumes:
+        - nextcloud_html:/var/www/html
+        - ${DATA_PATH:-./data}/nextcloud:/var/www/html/data
+        - /data/nextcloud/hooks:/custom-hooks
+        - /data/nextcloud/hooks/install-ffmpeg.sh:/docker-entrypoint-hooks.d/before-starting/install-ffmpeg.sh
+      networks:
+        - backend
 
   # ===========================================
   # HaRP - Reverse Proxy AppAPI haute performance

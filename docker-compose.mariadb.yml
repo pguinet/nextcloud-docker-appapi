@@ -26,8 +26,9 @@ services:
   # Nextcloud - Application principale
   # ===========================================
   nextcloud:
-    image: nextcloud:${NEXTCLOUD_VERSION:-32}-apache
-    pull_policy: always
+    #image: nextcloud:${NEXTCLOUD_VERSION:-32}-apache
+    #pull_policy: always
+    build: ./
     container_name: nextcloud-app
     restart: unless-stopped
     depends_on:
@@ -64,7 +65,6 @@ services:
     volumes:
       - nextcloud_html:/var/www/html
       - ${DATA_PATH:-./data}/nextcloud:/var/www/html/data
-      - /data/nextcloud/hooks/install-ffmpeg.sh:/docker-entrypoint-hooks.d/before-starting/install-ffmpeg.sh
     networks:
       - frontend
       - backend
@@ -114,7 +114,8 @@ services:
   # Cron - Tâches planifiées
   # ===========================================
   cron:
-      image: nextcloud:${NEXTCLOUD_VERSION:-32}-apache
+      #image: nextcloud:${NEXTCLOUD_VERSION:-32}-apache
+      build: ./
       container_name: nextcloud-cron
       restart: unless-stopped
       depends_on:
@@ -125,7 +126,6 @@ services:
         - nextcloud_html:/var/www/html
         - ${DATA_PATH:-./data}/nextcloud:/var/www/html/data
         - /data/nextcloud/hooks:/custom-hooks
-        - /data/nextcloud/hooks/install-ffmpeg.sh:/docker-entrypoint-hooks.d/before-starting/install-ffmpeg.sh
       networks:
         - backend
 

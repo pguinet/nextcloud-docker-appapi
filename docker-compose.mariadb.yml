@@ -125,7 +125,7 @@ services:
       volumes:
         - nextcloud_html:/var/www/html
         - ${DATA_PATH:-./data}/nextcloud:/var/www/html/data
-        - /data/nextcloud/hooks:/custom-hooks
+        - ./hooks:/custom-hooks
       networks:
         - backend
 

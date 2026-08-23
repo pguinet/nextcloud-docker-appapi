@@ -1,11 +1,12 @@
 [Unit]
-Description=Sauvegarde quotidienne de la base Nextcloud
+Description=Sauvegarde hebdomadaire de la base Nextcloud
 Documentation=https://github.com/pguinet/nextcloud-docker-appapi
 
 [Timer]
-# 3h00, dans la fenêtre de maintenance Nextcloud (1h-5h UTC) et avant les
-# transferts de la journée.
-OnCalendar=*-*-* 03:00:00
+# Dimanche 3h00, dans la fenêtre de maintenance Nextcloud (1h-5h UTC).
+# Hebdomadaire et non quotidien : la destination est facturée au volume.
+# Contrepartie assumée : jusqu'à 7 jours de base perdus en cas de sinistre.
+OnCalendar=Sun *-*-* 03:00:00
 # Décale de quelques minutes pour ne pas démarrer pile à l'heure ronde,
 # en même temps que tout le reste.
 RandomizedDelaySec=10m

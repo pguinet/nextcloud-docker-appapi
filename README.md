@@ -291,12 +291,18 @@ Sauvegarde de la **base de données** seule, adaptée au moteur en place
 ```
 
 Le dump est écrit dans `/data/nextcloud/db-backups/`, vérifié (présence du
-marqueur de fin, pas seulement un gzip valide) puis renommé : un fichier au nom
-définitif est toujours un dump complet. La rotation, par défaut à 14 jours,
+marqueur de fin, pas seulement une archive lisible) puis renommé : un fichier au
+nom définitif est toujours un dump complet. La rotation, par défaut à 35 jours,
 n'a lieu qu'après un dump validé. Variables : `BACKUP_DIR`, `RETENTION_DAYS`,
-`DB_CONTAINER`, `DB_NAME`, `MIN_FREE_MB`.
+`DB_CONTAINER`, `DB_NAME`, `MIN_FREE_MB`, `COMPRESSOR`.
 
-Pour l'automatiser, deux unités systemd sont fournies dans `systemd/` :
+La compression par défaut est **xz**, qui gagne environ 40 % sur gzip pour un
+dump SQL — 84 Mo contre 138 Mo sur cette instance. Cela compte quand la
+destination est facturée au volume. Le prix à payer est un pic de ~1 Go de RAM
+et quelques minutes de CPU ; `COMPRESSOR=gzip` revient au comportement rapide.
+
+Pour l'automatiser, deux unités systemd sont fournies dans `systemd/` — la
+sauvegarde est **hebdomadaire** (dimanche 3h UTC) :
 
 ```bash
 sudo cp systemd/nextcloud-backup-db.* /etc/systemd/system/
@@ -311,6 +317,16 @@ journalctl -u nextcloud-backup-db.service         # dernier compte rendu
 > (synchronisation externe, instantanés, stockage objet…). Et un dump posé sur
 > le disque qu'il protège ne protège de rien : visez une destination qui quitte
 > la machine.
+>
+> **Rythme hebdomadaire = jusqu'à 7 jours de base perdus** en cas de sinistre.
+> Les fichiers, répliqués en continu par ailleurs, ne sont pas concernés ; en
+> revanche calendriers, contacts, partages et commentaires n'existent que dans
+> la base. Passer à `OnCalendar=*-*-* 03:00:00` pour un rythme quotidien.
+>
+> Si la destination est un stockage objet synchronisé, vérifiez que la
+> suppression se propage : sans cela la rotation locale ne sert à rien et les
+> dumps s'accumulent indéfiniment côté distant. Une règle de cycle de vie sur
+> le bucket est plus fiable qu'un espoir de synchronisation.
 
 Le script historique `./scripts/backup.sh` sauvegarde base **et** fichiers,
 mais il est écrit pour PostgreSQL (`pg_dump`) : il échoue sur une installation

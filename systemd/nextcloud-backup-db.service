@@ -1,0 +1,19 @@
+[Unit]
+Description=Sauvegarde de la base Nextcloud
+Documentation=https://github.com/pguinet/nextcloud-docker-appapi
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root/nextcloud-docker-appapi
+ExecStart=/root/nextcloud-docker-appapi/scripts/backup-db.sh
+# Le script journalise sur stdout ; systemd route vers le journal.
+StandardOutput=journal
+StandardError=journal
+# Une sauvegarde n'a aucune raison de durer des heures : au-delà, quelque
+# chose est bloqué et il vaut mieux échouer visiblement.
+TimeoutStartSec=1800
+
+[Install]
+WantedBy=multi-user.target

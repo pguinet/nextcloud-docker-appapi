@@ -283,9 +283,38 @@ docker compose exec -u www-data nextcloud php occ files:scan --all
 
 ### Backup
 
+Sauvegarde de la **base de données** seule, adaptée au moteur en place
+(MariaDB ou PostgreSQL) :
+
 ```bash
-./scripts/backup.sh
+./scripts/backup-db.sh
 ```
+
+Le dump est écrit dans `/data/nextcloud/db-backups/`, vérifié (présence du
+marqueur de fin, pas seulement un gzip valide) puis renommé : un fichier au nom
+définitif est toujours un dump complet. La rotation, par défaut à 14 jours,
+n'a lieu qu'après un dump validé. Variables : `BACKUP_DIR`, `RETENTION_DAYS`,
+`DB_CONTAINER`, `DB_NAME`, `MIN_FREE_MB`.
+
+Pour l'automatiser, deux unités systemd sont fournies dans `systemd/` :
+
+```bash
+sudo cp systemd/nextcloud-backup-db.* /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now nextcloud-backup-db.timer
+systemctl list-timers nextcloud-backup-db.timer   # prochaine exécution
+journalctl -u nextcloud-backup-db.service         # dernier compte rendu
+```
+
+> **Les fichiers utilisateurs ne sont pas couverts par ce script.** Il ne
+> sauvegarde que la base ; prévoyez un mécanisme distinct pour `data/nextcloud`
+> (synchronisation externe, instantanés, stockage objet…). Et un dump posé sur
+> le disque qu'il protège ne protège de rien : visez une destination qui quitte
+> la machine.
+
+Le script historique `./scripts/backup.sh` sauvegarde base **et** fichiers,
+mais il est écrit pour PostgreSQL (`pg_dump`) : il échoue sur une installation
+MariaDB.
 
 ### Restauration
 
@@ -301,7 +330,7 @@ data/
 │   └── hooks/          # Scripts custom
 │       ├── install-ffmpeg.sh   # Installation ffmpeg au démarrage
 │       └── cron-custom.sh      # Cron personnalisé (background jobs + previews)
-├── db/                 # Données PostgreSQL
+├── db/                 # Données de la base (PostgreSQL ou MariaDB)
 └── redis/              # Données Redis
 ```
 
@@ -385,7 +414,7 @@ docker exec -u www-data nextcloud-app php occ memories:index
 
 ```bash
 # Backup d'abord !
-./scripts/backup.sh
+./scripts/backup-db.sh
 
 # Mettre à jour l'image
 docker compose pull nextcloud

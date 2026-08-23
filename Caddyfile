@@ -56,3 +56,8 @@
         }
     }
 }
+
+# Sites additionnels propres a l'hote (non versionnes).
+# Deposer un fichier .caddy dans caddy-sites/ pour declarer un site
+# supplementaire servi par ce meme Caddy. Le glob accepte un repertoire vide.
+import /etc/caddy/sites/*.caddy

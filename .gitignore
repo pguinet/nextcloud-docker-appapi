@@ -23,3 +23,6 @@ Thumbs.db
 backups/
 *.tar.gz
 *.sql
+
+# Sites Caddy propres a l'hote (voir caddy-sites/README.md)
+caddy-sites/*.caddy

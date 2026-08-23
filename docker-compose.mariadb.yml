@@ -121,6 +121,10 @@ services:
       build: ./
       container_name: nextcloud-cron
       restart: unless-stopped
+      # Sans cet utilisateur, le script tourne en root : Nextcloud refuse alors de
+      # s'initialiser ("File sequence directory exists but is not writable") et
+      # preview:pre-generate ecrirait des fichiers root dans les donnees.
+      user: www-data
       depends_on:
         - nextcloud
       entrypoint: /bin/bash

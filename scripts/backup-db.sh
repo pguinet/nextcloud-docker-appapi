@@ -14,6 +14,10 @@
 #   BACKUP_DIR=/ailleurs ./backup-db.sh  # autre destination
 #   RETENTION_DAYS=30 ./backup-db.sh     # autre rétention
 #   COMPRESSOR=gzip ./backup-db.sh       # xz (défaut), zstd ou gzip
+#   EXCLUDE_TABLES= ./backup-db.sh       # dump intégral, sans exclusion
+#
+# Restauration : après réimport, régénérer les données exclues avec
+#   docker compose exec -u www-data nextcloud php occ memories:places-setup
 #
 # Codes de sortie : 0 succès, 1 erreur de configuration, 2 échec du dump.
 
@@ -27,6 +31,19 @@ MIN_FREE_MB="${MIN_FREE_MB:-2048}"
 # xz gagne ~40 % sur gzip pour un dump SQL, ce qui compte quand la destination
 # est facturée au volume. Repasser à gzip si le temps CPU pose problème.
 COMPRESSOR="${COMPRESSOR:-xz}"
+
+# Tables dont les DONNÉES sont exclues du dump — leur structure, elle, est
+# conservée, si bien que la restauration les recrée vides et que l'application
+# ne trouve pas une table manquante.
+#
+# N'y placer que des données reconstructibles sans perte et sans référence
+# depuis le reste du schéma. Les tables planet de Memories sont des données
+# OpenStreetMap statiques, régénérées par `occ memories:places-setup` ; elles
+# pèsent à elles seules plus des trois quarts du dump.
+#
+# À l'inverse, oc_filecache n'a rien à faire ici : les partages référencent les
+# fileid, qu'un rescan réattribuerait — les partages seraient rompus.
+EXCLUDE_TABLES="${EXCLUDE_TABLES-memories_planet_geometry oc_memories_planet}"
 
 log()  { printf '[%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$1"; }
 # Lecture indifferente au compresseur, pour verifier aussi les anciens dumps.
@@ -86,18 +103,37 @@ cleanup() { rm -f "$TMP"; }
 trap cleanup EXIT
 
 log "moteur détecté : $ENGINE, compression $COMPRESSOR — sauvegarde de '$DB_NAME' vers $TARGET"
+if [ "$ENGINE" = mariadb ] && [ -n "$EXCLUDE_TABLES" ]; then
+    log "données exclues (structure conservée) : $EXCLUDE_TABLES"
+fi
 
 # PIPESTATUS ne survit pas à la commande suivante, fût-ce une affectation :
 # il est donc lu immédiatement après le pipeline, et le marqueur défini avant.
 set +e
 if [ "$ENGINE" = mariadb ]; then
     END_MARKER='Dump completed'
-    docker exec "$DB_CONTAINER" mariadb-dump \
-        -uroot -p"$MYSQL_PW" \
-        --single-transaction --quick \
-        --routines --triggers --events \
-        "$DB_NAME" 2>/dev/null | "${COMPRESS_CMD[@]}" > "$TMP"
-    status=${PIPESTATUS[0]}
+    ignore_args=()
+    for t in $EXCLUDE_TABLES; do ignore_args+=("--ignore-table=${DB_NAME}.${t}"); done
+
+    if [ ${#ignore_args[@]} -eq 0 ]; then
+        docker exec "$DB_CONTAINER" mariadb-dump \
+            -uroot -p"$MYSQL_PW" \
+            --single-transaction --quick \
+            --routines --triggers --events \
+            "$DB_NAME" 2>/dev/null | "${COMPRESS_CMD[@]}" > "$TMP"
+        status=${PIPESTATUS[0]}
+    else
+        # Deux passes : le schéma complet, puis les données sans les tables
+        # exclues. Un seul --ignore-table ferait disparaître aussi la structure.
+        {
+            docker exec "$DB_CONTAINER" mariadb-dump -uroot -p"$MYSQL_PW" \
+                --no-data --routines --triggers --events "$DB_NAME" 2>/dev/null || exit 1
+            docker exec "$DB_CONTAINER" mariadb-dump -uroot -p"$MYSQL_PW" \
+                --no-create-info --single-transaction --quick \
+                "${ignore_args[@]}" "$DB_NAME" 2>/dev/null || exit 1
+        } | "${COMPRESS_CMD[@]}" > "$TMP"
+        status=${PIPESTATUS[0]}
+    fi
 else
     END_MARKER='PostgreSQL database dump complete'
     docker exec -e PGPASSWORD="$PG_PW" "$DB_CONTAINER" \

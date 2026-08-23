@@ -297,9 +297,30 @@ n'a lieu qu'après un dump validé. Variables : `BACKUP_DIR`, `RETENTION_DAYS`,
 `DB_CONTAINER`, `DB_NAME`, `MIN_FREE_MB`, `COMPRESSOR`.
 
 La compression par défaut est **xz**, qui gagne environ 40 % sur gzip pour un
-dump SQL — 84 Mo contre 138 Mo sur cette instance. Cela compte quand la
-destination est facturée au volume. Le prix à payer est un pic de ~1 Go de RAM
-et quelques minutes de CPU ; `COMPRESSOR=gzip` revient au comportement rapide.
+dump SQL. Le prix à payer est un pic de ~1 Go de RAM et quelques minutes de
+CPU ; `COMPRESSOR=gzip` revient au comportement rapide.
+
+`EXCLUDE_TABLES` retire les **données** de certaines tables tout en conservant
+leur **structure** : la restauration les recrée vides. Par défaut, les tables
+planet de l'app Memories — des données OpenStreetMap statiques, sans rien
+d'utilisateur, régénérées par `occ memories:places-setup`. Elles pèsent à elles
+seules plus des trois quarts du dump :
+
+| Dump | Brut | xz |
+|------|------|-----|
+| intégral | 609 Mo | 84 Mo |
+| sans les tables planet | 101 Mo | **15 Mo** |
+
+N'y ajouter que des données reconstructibles sans perte. `oc_filecache`, malgré
+sa taille, n'est pas candidate : les partages référencent les `fileid`, qu'un
+rescan réattribuerait — les partages seraient rompus. `EXCLUDE_TABLES=` produit
+un dump intégral.
+
+**Après restauration**, régénérer les données exclues :
+
+```bash
+docker compose exec -u www-data nextcloud php occ memories:places-setup
+```
 
 Pour l'automatiser, deux unités systemd sont fournies dans `systemd/` — la
 sauvegarde est **hebdomadaire** (dimanche 3h UTC) :

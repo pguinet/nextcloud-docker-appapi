@@ -7,7 +7,16 @@
         # Filtre IP : seules les adresses de NEXTCLOUD_ALLOWED_IPS passent,
         # plus le reseau backend (conteneurs de la stack et ExApps qui
         # appellent l'URL publique). Variable vide = acces externe ferme.
-        @hors_liste not remote_ip {$NEXTCLOUD_BACKEND_SUBNET} {$NEXTCLOUD_ALLOWED_IPS}
+        # Les sondes UptimeRobot n'ont droit qu'a GET/HEAD sur /status.php ;
+        # leur liste se regenere avec scripts/update-uptimerobot-ips.sh.
+        @hors_liste {
+            not remote_ip {$NEXTCLOUD_BACKEND_SUBNET} {$NEXTCLOUD_ALLOWED_IPS}
+            not {
+                method GET HEAD
+                path /status.php
+                import /etc/caddy/uptimerobot-ips.caddy
+            }
+        }
         respond @hors_liste "Accès refusé" 403
 
         # La passerelle du reseau backend n'est pas un conteneur : c'est

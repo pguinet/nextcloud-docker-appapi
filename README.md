@@ -31,8 +31,9 @@ Stack Docker complète pour déployer Nextcloud avec support AppAPI (ExApps) sur
 | --- | --- | --- |
 | Caddy | `caddy/Dockerfile` (Caddy + Coraza) | Reverse proxy avec SSL automatique, filtre IP et WAF |
 | Nextcloud | `nextcloud:32-apache` | Application principale |
-| PostgreSQL | `postgres:16-alpine` | Base de données |
-| Redis | `redis:7-alpine` | Cache et file locking |
+| MariaDB | `dhi.io/mariadb:11.8` | Base de données (variante MariaDB) |
+| PostgreSQL | `postgres:16-alpine` | Base de données (variante PostgreSQL) |
+| Redis | `dhi.io/redis:7` | Cache et file locking |
 | Cron | `nextcloud:32-apache` | Tâches planifiées + pré-génération des previews |
 | Docker Socket Proxy | `tecnativa/docker-socket-proxy` | Proxy sécurisé pour AppAPI |
 
@@ -41,6 +42,7 @@ Stack Docker complète pour déployer Nextcloud avec support AppAPI (ExApps) sur
 * VPS avec Docker et Docker Compose installés
 * Nom de domaine pointant vers le VPS
 * Ports 80 et 443 ouverts
+* Un compte Docker Hub (gratuit) et `docker login dhi.io` : MariaDB et Redis utilisent les [Docker Hardened Images](#images-docker-hardened-images-mariadb-redis), dont le téléchargement exige d'être authentifié
 
 ### Installation Docker (Debian/Ubuntu)
 
@@ -494,6 +496,35 @@ docker compose exec caddy caddy reload --config /etc/caddy/Caddyfile
 ```
 
 Le banc de test `tests/caddy-waf/run.sh` vérifie le filtre IP, les blocages du WAF et le passage du trafic Nextcloud (WebDAV, CalDAV, OCS, gros uploads). Le relancer après toute modification du `Caddyfile` ou de la configuration Coraza.
+
+## Images Docker Hardened Images (MariaDB, Redis)
+
+MariaDB et Redis utilisent les [Docker Hardened Images](https://hub.docker.com/hardened-images/catalog) (`dhi.io/mariadb:11.8`, `dhi.io/redis:7`) : images minimales, sans gestionnaire de paquets, peu de CVE, avec SBOM et provenance signée. Le téléchargement exige `docker login dhi.io` avec un compte Docker Hub.
+
+Elles ne se comportent pas comme les images officielles :
+
+* **Utilisateur nonroot (uid 65532)** : elles ne peuvent pas s'approprier leur répertoire de données. `scripts/prepare-data-dirs.sh` donne `db/` et `redis/` à cet uid (appelé par `install.sh`).
+* **MariaDB ignore les arguments de `command`** : les options du serveur passent par `MARIADB_OPTIONS`.
+* **MariaDB ne crée que le compte root** : `MYSQL_DATABASE`, `MYSQL_USER` et `MYSQL_PASSWORD` sont ignorés. `scripts/init-mariadb.sh` crée la base et l'utilisateur (appelé par `install.sh`, idempotent).
+* **Redis n'a pas d'entrypoint** : `--protected-mode no` doit être passé explicitement, sinon les clients hors loopback sont refusés.
+
+Le banc de test `tests/db-redis/run.sh` vérifie une installation neuve et la reprise de données créées par les images officielles.
+
+### Migrer depuis les images officielles
+
+Les versions majeures sont identiques (MariaDB 11.8, Redis 7.4) : aucune conversion de données, seul le propriétaire des fichiers change (999 → 65532).
+
+```bash
+docker login dhi.io
+./scripts/backup-db.sh
+
+docker compose stop cron nextcloud
+docker compose stop db redis
+./scripts/prepare-data-dirs.sh "${DATA_PATH:-./data}"
+docker compose up -d
+```
+
+Retour arrière : annuler le commit (`git revert`, qui remet aussi les options MariaDB dans `command`), puis `sudo chown -R 999:999 <DATA_PATH>/db <DATA_PATH>/redis` avant `docker compose up -d`.
 
 ## Mise à jour de Nextcloud
 

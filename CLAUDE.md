@@ -92,6 +92,8 @@ docker compose exec -u www-data nextcloud php occ maintenance:mode --off
 | `scripts/install.sh` | Interactive initial setup |
 | `scripts/backup.sh` | Full backup automation |
 | `scripts/restore.sh` | Backup restoration |
+| `scripts/prepare-data-dirs.sh` | Chown `db/` and `redis/` to uid 65532 (DHI images run nonroot) |
+| `scripts/init-mariadb.sh` | Create Nextcloud DB + user (DHI MariaDB ignores `MYSQL_DATABASE`/`MYSQL_USER`) |
 
 ## Data Layout
 
@@ -121,6 +123,16 @@ docker compose exec -u www-data nextcloud php occ app_api:daemon:register \
   --harp_shared_key "${HARP_SHARED_KEY}" \
   --set-default
 ```
+
+## Docker Hardened Images (MariaDB, Redis)
+
+`db` and `redis` use `dhi.io/mariadb:11.8` and `dhi.io/redis:7`; pulling needs `docker login dhi.io`. They differ from the official images:
+- run as uid 65532 → data dirs must be chowned (`scripts/prepare-data-dirs.sh`)
+- MariaDB ignores `command` args → server options go in `MARIADB_OPTIONS`
+- MariaDB only creates root → `scripts/init-mariadb.sh` creates the DB and user
+- Redis has no entrypoint → `--protected-mode no` must be explicit
+
+Test bench: `tests/db-redis/run.sh` (fresh install + migration from official images).
 
 ## Environment Variables
 

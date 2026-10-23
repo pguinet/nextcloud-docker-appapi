@@ -75,6 +75,8 @@ check "options de mariadbd"       "ON,ROW,READ-COMMITTED,ON,0" "$(sql 'SELECT CO
     @@log_bin_trust_function_creators, @@slave_connections_needed_for_purge)')"
 # 1 Go par defaut (MARIADB_BUFFER_POOL_SIZE) : recommande par les setupchecks de Nextcloud
 check "buffer pool InnoDB"        1073741824 "$(sql 'SELECT @@innodb_buffer_pool_size')"
+# Les setupchecks (serverinfo) demandent au moins 128 Mo
+check "journal InnoDB"            268435456 "$(sql 'SELECT @@innodb_log_file_size')"
 check "mariadb-dump (sauvegarde)" 0 "$("${COMPOSE[@]}" exec -T db mariadb-dump -uroot -ptest-root \
     --single-transaction nextcloud >/dev/null 2>&1; echo $?)"
 check "Redis joignable"           PONG "$(rcli ping)"
@@ -102,6 +104,8 @@ docker stop db-redis-test-official-db db-redis-test-official-redis >/dev/null
 ../../scripts/prepare-data-dirs.sh "$DATA_PATH" || exit 1
 up
 check "MariaDB : donnees reprises" migre "$(sql 'SELECT v FROM oc_test')"
+# Journal de 96 Mo cree par l'image officielle, redimensionne au demarrage
+check "journal InnoDB redimensionne" 268435456 "$(sql 'SELECT @@innodb_log_file_size')"
 check "Redis : donnees reprises"   migre "$(rcli get cle)"
 
 echo

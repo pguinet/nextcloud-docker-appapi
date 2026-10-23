@@ -73,6 +73,8 @@ check "utilisateur nextcloud"     1 "$(sql 'SELECT 1')"
 check "options de mariadbd"       "ON,ROW,READ-COMMITTED,ON,0" "$(sql 'SELECT CONCAT_WS(",",
     @@log_bin, @@binlog_format, @@transaction_isolation,
     @@log_bin_trust_function_creators, @@slave_connections_needed_for_purge)')"
+# 1 Go par defaut (MARIADB_BUFFER_POOL_SIZE) : recommande par les setupchecks de Nextcloud
+check "buffer pool InnoDB"        1073741824 "$(sql 'SELECT @@innodb_buffer_pool_size')"
 check "mariadb-dump (sauvegarde)" 0 "$("${COMPOSE[@]}" exec -T db mariadb-dump -uroot -ptest-root \
     --single-transaction nextcloud >/dev/null 2>&1; echo $?)"
 check "Redis joignable"           PONG "$(rcli ping)"

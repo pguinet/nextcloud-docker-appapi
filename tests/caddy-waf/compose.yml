@@ -1,0 +1,55 @@
+# Banc de test du Caddyfile (filtre IP + WAF), lance par run.sh.
+# Nextcloud et HaRP sont remplaces par traefik/whoami, qui renvoie 200.
+# Le reseau "internet" utilise des plages de documentation (non privees)
+# pour que le filtre IP s'applique aux clients de test.
+name: caddy-waf-test
+
+services:
+  caddy:
+    build: ../../caddy
+    image: nextcloud-caddy-waf
+    environment:
+      - NEXTCLOUD_DOMAIN=nc.localhost
+      - NEXTCLOUD_ALLOWED_IPS=198.51.100.10 2001:db8:100::10/128
+    volumes:
+      - ../../Caddyfile:/etc/caddy/Caddyfile:ro
+      - ../../caddy/coraza:/etc/caddy/coraza:ro
+    networks:
+      internet:
+        ipv4_address: 198.51.100.2
+        ipv6_address: 2001:db8:100::2
+      backend: {}
+
+  nextcloud:
+    image: traefik/whoami:v1.11.0
+    networks: [backend]
+
+  appapi-harp:
+    image: traefik/whoami:v1.11.0
+    command: ["--port", "8780"]
+    networks: [backend]
+
+  client-allowed:
+    image: curlimages/curl:8.16.0
+    command: ["sleep", "infinity"]
+    networks:
+      internet:
+        ipv4_address: 198.51.100.10
+        ipv6_address: 2001:db8:100::10
+
+  client-denied:
+    image: curlimages/curl:8.16.0
+    command: ["sleep", "infinity"]
+    networks:
+      internet:
+        ipv4_address: 198.51.100.20
+        ipv6_address: 2001:db8:100::20
+
+networks:
+  internet:
+    enable_ipv6: true
+    ipam:
+      config:
+        - subnet: 198.51.100.0/24
+        - subnet: 2001:db8:100::/64
+  backend: {}

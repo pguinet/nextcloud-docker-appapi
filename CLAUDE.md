@@ -90,6 +90,7 @@ docker compose exec -u www-data nextcloud php occ maintenance:mode --off
 | `Caddyfile` | Reverse proxy with SSL and security headers |
 | `.env.example` | Environment variable template |
 | `scripts/install.sh` | Interactive initial setup |
+| `scripts/generate-env.sh` | Generate `.env` for a variant (prompts + secrets, values single-quoted, mode 600); test: `tests/install/run.sh` |
 | `scripts/backup.sh` | Full backup automation |
 | `scripts/restore.sh` | Backup restoration |
 | `scripts/prepare-data-dirs.sh` | Chown `db/`, `redis/` and Caddy volumes to uid 65532 (DHI images run nonroot) |

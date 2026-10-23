@@ -42,37 +42,13 @@ fi
 log_info "Docker et Docker Compose sont installés ✓"
 
 # Vérifier/créer .env
+# docker-compose.yml pointe vers la variante choisie (MariaDB par défaut)
+if grep -q 'dhi.io/mariadb' docker-compose.yml; then VARIANT=mariadb; else VARIANT=postgres; fi
 if [ ! -f ".env" ]; then
-    if [ ! -f ".env.example" ]; then
-        log_error ".env.example non trouvé"
-        exit 1
-    fi
-    
-    log_warn "Fichier .env non trouvé. Configuration interactive..."
+    log_warn "Fichier .env non trouvé. Configuration interactive (variante ${VARIANT})..."
     echo ""
-    
-    read -p "Nom de domaine Nextcloud (ex: cloud.example.com): " DOMAIN
-    read -p "Nom d'utilisateur admin [admin]: " ADMIN_USER
-    ADMIN_USER=${ADMIN_USER:-admin}
-    read -s -p "Mot de passe admin: " ADMIN_PASS
-    echo ""
-    
-    # Générer un mot de passe DB aléatoire
-    DB_PASS=$(openssl rand -base64 24 | tr -dc 'a-zA-Z0-9' | head -c 24)
-    
-    cat > .env << EOF
-NEXTCLOUD_DOMAIN=${DOMAIN}
-NEXTCLOUD_VERSION=30
-NEXTCLOUD_ADMIN_USER=${ADMIN_USER}
-NEXTCLOUD_ADMIN_PASSWORD=${ADMIN_PASS}
-POSTGRES_DB=nextcloud
-POSTGRES_USER=nextcloud
-POSTGRES_PASSWORD=${DB_PASS}
-PHP_MEMORY_LIMIT=1G
-PHP_UPLOAD_LIMIT=10G
-EOF
-    
-    log_info "Fichier .env créé ✓"
+    scripts/generate-env.sh "$VARIANT" .env
+    log_info "Fichier .env créé ✓ (secrets générés, droits 600)"
 else
     log_info "Fichier .env existant trouvé ✓"
 fi
@@ -115,8 +91,11 @@ else
     log_info "Vérifiez les logs avec: docker compose logs -f nextcloud"
 fi
 
-# Afficher les informations
-source .env
+# Afficher les informations, sans sourcer .env : un ancien .env aux valeurs
+# non protégées (espaces, $) casserait le shell
+env_get() { sed -n "s/^$1=//p" .env | tail -1 | sed -E "s/^'(.*)'$/\1/; s/^\"(.*)\"$/\1/"; }
+NEXTCLOUD_DOMAIN=$(env_get NEXTCLOUD_DOMAIN)
+NEXTCLOUD_ADMIN_USER=$(env_get NEXTCLOUD_ADMIN_USER)
 echo ""
 echo -e "${GREEN}=========================================="
 echo "  Installation terminée !"

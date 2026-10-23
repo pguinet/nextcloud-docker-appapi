@@ -73,7 +73,10 @@ networks:
       config:
         - subnet: 172.30.0.0/24
           gateway: 172.30.0.1
+          # IP dynamiques hors de celle fixee pour Caddy (.2)
+          ip_range: 172.30.0.128/25
   autre-prive:
     ipam:
       config:
         - subnet: 10.99.0.0/24
+          ip_range: 10.99.0.128/25

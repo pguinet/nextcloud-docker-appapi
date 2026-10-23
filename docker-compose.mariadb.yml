@@ -96,24 +96,31 @@ services:
   # MariaDB - Base de données
   # ===========================================
   db:
-    image: mariadb:11
+    # Docker Hardened Image : tourne en nonroot (uid 65532), cf. scripts/prepare-data-dirs.sh.
+    # Son entrypoint differe de l'image officielle : il ignore les arguments de command
+    # (options a passer dans MARIADB_OPTIONS) et ne cree ni base ni utilisateur
+    # (cf. scripts/init-mariadb.sh).
+    image: dhi.io/mariadb:11.8
     container_name: nextcloud-db
     restart: unless-stopped
-    # --slave-connections-needed-for-purge=0 : sans ce reglage, MariaDB 11.4+ refuse de purger
-    # les binlogs tant qu'aucun replica ne les a consommes, et ils s'accumulent indefiniment
-    # malgre expire_logs_days. Ce serveur est standalone : aucun replica n'existe.
-    command: --transaction-isolation=READ-COMMITTED --log-bin=binlog --binlog-format=ROW --log-bin-trust-function-creators=1 --slave-connections-needed-for-purge=0
     environment:
+      # Lus par scripts/init-mariadb.sh, pas par l'image
       - MYSQL_DATABASE=${MYSQL_DATABASE:-nextcloud}
       - MYSQL_USER=${MYSQL_USER:-nextcloud}
       - MYSQL_PASSWORD=${MYSQL_PASSWORD}
       - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      # --slave-connections-needed-for-purge=0 : sans ce reglage, MariaDB 11.4+ refuse de purger
+      # les binlogs tant qu'aucun replica ne les a consommes, et ils s'accumulent indefiniment
+      # malgre expire_logs_days. Ce serveur est standalone : aucun replica n'existe.
+      - MARIADB_OPTIONS=--transaction-isolation=READ-COMMITTED --log-bin=binlog --binlog-format=ROW --log-bin-trust-function-creators=1 --slave-connections-needed-for-purge=0
     volumes:
       - ${DATA_PATH:-./data}/db:/var/lib/mysql
     networks:
       - backend
     healthcheck:
-      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      # Sans --innodb_initialized : il exige les identifiants de .my-healthcheck.cnf, que
+      # seule l'image officielle cree. Le serveur DHI n'ecoute qu'apres l'init d'InnoDB.
+      test: ["CMD", "healthcheck.sh", "--connect"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -122,10 +129,13 @@ services:
   # Redis - Cache et File Locking
   # ===========================================
   redis:
-    image: redis:7-alpine
+    # Docker Hardened Image : tourne en nonroot (uid 65532), cf. scripts/prepare-data-dirs.sh
+    image: dhi.io/redis:7
     container_name: nextcloud-redis
     restart: unless-stopped
-    command: redis-server --save 60 1 --loglevel warning
+    # --protected-mode no : l'entrypoint de l'image officielle l'ajoutait de lui-meme ; sans lui,
+    # Redis refuse tout client hors loopback. Sans danger : redis n'est que sur le reseau backend.
+    command: redis-server --save 60 1 --loglevel warning --protected-mode no
     volumes:
       - ${DATA_PATH:-./data}/redis:/data
     networks:

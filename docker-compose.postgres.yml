@@ -113,10 +113,13 @@ services:
   # Redis - Cache et File Locking
   # ===========================================
   redis:
-    image: redis:7-alpine
+    # Docker Hardened Image : tourne en nonroot (uid 65532), cf. scripts/prepare-data-dirs.sh
+    image: dhi.io/redis:7
     container_name: nextcloud-redis
     restart: unless-stopped
-    command: redis-server --save 60 1 --loglevel warning
+    # --protected-mode no : l'entrypoint de l'image officielle l'ajoutait de lui-meme ; sans lui,
+    # Redis refuse tout client hors loopback. Sans danger : redis n'est que sur le reseau backend.
+    command: redis-server --save 60 1 --loglevel warning --protected-mode no
     volumes:
       - ${DATA_PATH:-./data}/redis:/data
     networks:

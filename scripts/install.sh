@@ -85,9 +85,18 @@ chmod 750 data
 # Rendre les scripts exécutables
 chmod +x scripts/*.sh
 
+# MariaDB et Redis (images dhi.io) tournent en nonroot (uid 65532)
+log_info "Attribution des répertoires db et redis à l'uid 65532..."
+scripts/prepare-data-dirs.sh data
+
 # Démarrer la stack
 log_info "Démarrage de la stack Docker..."
 docker compose pull
+# L'image DHI de MariaDB ne crée ni la base ni l'utilisateur : le faire avant Nextcloud
+if docker compose config --images | grep -q '^dhi.io/mariadb'; then
+    docker compose up -d --wait db
+    scripts/init-mariadb.sh
+fi
 docker compose up -d
 
 log_info "En attente du démarrage de Nextcloud..."

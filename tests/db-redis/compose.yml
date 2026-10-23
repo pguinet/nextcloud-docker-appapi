@@ -1,0 +1,25 @@
+# Banc de test des services db (MariaDB) et redis, lance par run.sh.
+# Les services reprennent la definition de docker-compose.mariadb.yml via extends :
+# on teste la vraie configuration (image, command, healthcheck), seuls le nom
+# du conteneur et le reseau changent. DATA_PATH pointe vers un repertoire jetable.
+name: db-redis-test
+
+services:
+  db:
+    extends:
+      file: ../../docker-compose.mariadb.yml
+      service: db
+    container_name: db-redis-test-db
+    environment:
+      - MYSQL_PASSWORD=te'st
+      - MYSQL_ROOT_PASSWORD=test-root
+
+  redis:
+    extends:
+      file: ../../docker-compose.mariadb.yml
+      service: redis
+    container_name: db-redis-test-redis
+
+networks:
+  backend:
+    name: db-redis-test_backend

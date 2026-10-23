@@ -461,6 +461,15 @@ Le réseau `frontend` a l'IPv6 activé : sans lui, les clients IPv6 passent par 
 
 Après modification de `.env` : `docker compose up -d caddy`.
 
+#### Sondes UptimeRobot
+
+Les [sondes UptimeRobot](https://uptimerobot.com/help/locations/) sont autorisées, mais uniquement en `GET`/`HEAD` sur `/status.php` : un monitor doit pointer sur `https://<domaine>/status.php`. Leurs adresses sont dans `caddy/uptimerobot-ips.caddy`, généré à partir de la liste officielle. Cette liste évolue ; si des sondes se font refuser, la régénérer puis recharger Caddy :
+
+```bash
+./scripts/update-uptimerobot-ips.sh
+docker compose exec caddy caddy reload --config /etc/caddy/Caddyfile
+```
+
 ### WAF (Coraza + OWASP CRS)
 
 Caddy embarque le WAF [Coraza](https://coraza.io/) avec l'[OWASP Core Rule Set](https://coreruleset.org/) et le [plugin d'exclusions Nextcloud](https://github.com/coreruleset/nextcloud-rule-exclusions-plugin), en mode bloquant (paranoia level 1).

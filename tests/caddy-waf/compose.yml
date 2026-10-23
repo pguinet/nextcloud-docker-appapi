@@ -17,6 +17,8 @@ services:
     volumes:
       - ../../Caddyfile:/etc/caddy/Caddyfile:ro
       - ../../caddy/coraza:/etc/caddy/coraza:ro
+      # client-sonde joue le role d'une sonde UptimeRobot
+      - ./uptimerobot-ips.caddy:/etc/caddy/uptimerobot-ips.caddy:ro
     networks:
       internet:
         ipv4_address: 198.51.100.2
@@ -50,6 +52,14 @@ services:
       internet:
         ipv4_address: 198.51.100.20
         ipv6_address: 2001:db8:100::20
+
+  client-sonde:
+    image: curlimages/curl:8.16.0
+    command: ["sleep", "infinity"]
+    networks:
+      internet:
+        ipv4_address: 198.51.100.30
+        ipv6_address: 2001:db8:100::30
 
   client-backend:
     image: curlimages/curl:8.16.0

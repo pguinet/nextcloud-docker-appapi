@@ -44,11 +44,24 @@ check "IPv4 refusee"           403 "$(http client-denied  "$V4" "$URL/status.php
 check "IPv6 autorisee"         200 "$(http client-allowed "$V6" "$URL/status.php")"
 check "IPv6 refusee"           403 "$(http client-denied  "$V6" "$URL/status.php")"
 check "ExApps IP refusee"      403 "$(http client-denied  "$V4" "$URL/exapps/app/")"
+check "sonde : GET status.php" 200 "$(http client-sonde   "$V4" "$URL/status.php?format=json")"
+check "sonde : HEAD (IPv6)"    200 "$(http client-sonde   "$V6" -I "$URL/status.php")"
+check "sonde : autre page"     403 "$(http client-sonde   "$V4" "$URL/index.php/login")"
+check "sonde : POST"           403 "$(http client-sonde   "$V4" -X POST -d x=1 "$URL/status.php")"
 check "conteneur backend"      200 "$(http client-backend 172.30.0.2 "$URL/status.php")"
 check "autre reseau prive"     403 "$(http client-autre-prive 10.99.0.2 "$URL/status.php")"
 # Depuis l'hote, la requete arrive avec l'IP de la passerelle backend
 check "passerelle backend"     403 "$(curl -sk -o /dev/null -w '%{http_code}' \
     --resolve nc.localhost:443:172.30.0.2 "$URL/status.php")"
+
+echo "Configuration de prod"
+# Le Caddyfile doit aussi se charger avec la vraie liste UptimeRobot
+check "Caddyfile + vraie liste" 0 "$(docker run --rm -e NEXTCLOUD_DOMAIN=nc.localhost \
+    -e NEXTCLOUD_BACKEND_SUBNET=172.18.0.0/16 -e NEXTCLOUD_BACKEND_GATEWAY=172.18.0.1 \
+    -v "$PWD/../../Caddyfile:/etc/caddy/Caddyfile:ro" \
+    -v "$PWD/../../caddy/coraza:/etc/caddy/coraza:ro" \
+    -v "$PWD/../../caddy/uptimerobot-ips.caddy:/etc/caddy/uptimerobot-ips.caddy:ro" \
+    nextcloud-caddy-waf caddy validate --config /etc/caddy/Caddyfile >/dev/null 2>&1; echo $?)"
 
 echo "WAF"
 check "injection SQL"          403 "$(http client-allowed "$V4" "$URL/index.php?id=1%27%20OR%20%271%27=%271")"

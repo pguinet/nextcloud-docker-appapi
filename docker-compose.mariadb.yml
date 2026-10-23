@@ -112,7 +112,9 @@ services:
       # --slave-connections-needed-for-purge=0 : sans ce reglage, MariaDB 11.4+ refuse de purger
       # les binlogs tant qu'aucun replica ne les a consommes, et ils s'accumulent indefiniment
       # malgre expire_logs_days. Ce serveur est standalone : aucun replica n'existe.
-      - MARIADB_OPTIONS=--transaction-isolation=READ-COMMITTED --log-bin=binlog --binlog-format=ROW --log-bin-trust-function-creators=1 --slave-connections-needed-for-purge=0
+      # --innodb-buffer-pool-size : 1 Go recommande par les setupchecks de Nextcloud (128 Mo par
+      # defaut). A reduire via MARIADB_BUFFER_POOL_SIZE sur une machine avec peu de RAM.
+      - MARIADB_OPTIONS=--transaction-isolation=READ-COMMITTED --log-bin=binlog --binlog-format=ROW --log-bin-trust-function-creators=1 --slave-connections-needed-for-purge=0 --innodb-buffer-pool-size=${MARIADB_BUFFER_POOL_SIZE:-1G}
     volumes:
       - ${DATA_PATH:-./data}/db:/var/lib/mysql
     networks:

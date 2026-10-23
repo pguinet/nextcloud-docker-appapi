@@ -455,7 +455,7 @@ Caddy n'accepte que les adresses listées dans `NEXTCLOUD_ALLOWED_IPS` (fichier 
 NEXTCLOUD_ALLOWED_IPS=203.0.113.10 2001:db8:1234:5600::/56
 ```
 
-Les réseaux privés restent toujours autorisés : Nextcloud et les ExApps appellent l'URL publique, et un alias réseau sur `backend` les envoie directement vers Caddy. Toute autre adresse reçoit un `403`, y compris sur `/exapps/*`. Sans variable, plus rien n'est joignable depuis Internet. Les challenges Let's Encrypt ne sont pas concernés.
+Le réseau `backend` reste toujours autorisé : Nextcloud et les ExApps appellent l'URL publique, et un alias réseau sur `backend` les envoie directement vers Caddy. Son sous-réseau est fixé (`NEXTCLOUD_BACKEND_SUBNET`, `172.18.0.0/16` par défaut) ; sa passerelle (`NEXTCLOUD_BACKEND_GATEWAY`) est exclue, car c'est l'hôte et le trafic relayé par `docker-proxy` y apparaît. Les autres réseaux privés, y compris `frontend`, sont refusés. Toute autre adresse reçoit un `403`, y compris sur `/exapps/*`. Sans variable, plus rien n'est joignable depuis Internet. Les challenges Let's Encrypt ne sont pas concernés.
 
 Le réseau `frontend` a l'IPv6 activé : sans lui, les clients IPv6 passent par `docker-proxy` et Caddy ne voit que l'IP de la passerelle Docker, ce qui fausse le filtre.
 

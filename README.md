@@ -62,17 +62,25 @@ cd nextcloud-docker-appapi
 
 ### 2. Configurer l'environnement
 
+`scripts/install.sh` génère le `.env` s'il n'existe pas (`scripts/generate-env.sh`) : il demande le domaine, le compte admin et les IP autorisées, puis génère les mots de passe de la base et la clé HaRP.
+
+Pour l'écrire à la main :
+
 ```bash
-cp .env.example .env
+cp .env.example .env && chmod 600 .env
 nano .env
 ```
 
 Modifiez les valeurs :
 
 * `NEXTCLOUD_DOMAIN` : votre nom de domaine
-* `POSTGRES_PASSWORD` : mot de passe fort pour PostgreSQL
+* `NEXTCLOUD_ALLOWED_IPS` : IP ou plages autorisées, entre apostrophes (vide = aucun accès depuis Internet)
+* `MYSQL_PASSWORD` et `MYSQL_ROOT_PASSWORD` (MariaDB) ou `POSTGRES_PASSWORD` (PostgreSQL) : mots de passe forts
+* `HARP_SHARED_KEY` : `openssl rand -hex 32`
 * `NEXTCLOUD_ADMIN_USER` : nom d'utilisateur admin
 * `NEXTCLOUD_ADMIN_PASSWORD` : mot de passe admin
+
+Une valeur qui contient des espaces ou un `$` doit être entre apostrophes.
 
 ### 3. Créer les scripts custom
 

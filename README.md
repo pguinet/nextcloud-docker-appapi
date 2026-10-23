@@ -29,7 +29,7 @@ Stack Docker complète pour déployer Nextcloud avec support AppAPI (ExApps) sur
 
 | Service | Image | Rôle |
 | --- | --- | --- |
-| Caddy | `caddy/Dockerfile` (Caddy + Coraza) | Reverse proxy avec SSL automatique, filtre IP et WAF |
+| Caddy | `caddy/Dockerfile` (`dhi.io/caddy` + Coraza) | Reverse proxy avec SSL automatique, filtre IP et WAF |
 | Nextcloud | `nextcloud:32-apache` | Application principale |
 | MariaDB | `dhi.io/mariadb:11.8` | Base de données (variante MariaDB) |
 | PostgreSQL | `postgres:16-alpine` | Base de données (variante PostgreSQL) |
@@ -42,7 +42,7 @@ Stack Docker complète pour déployer Nextcloud avec support AppAPI (ExApps) sur
 * VPS avec Docker et Docker Compose installés
 * Nom de domaine pointant vers le VPS
 * Ports 80 et 443 ouverts
-* Un compte Docker Hub (gratuit) et `docker login dhi.io` : MariaDB et Redis utilisent les [Docker Hardened Images](#images-docker-hardened-images-mariadb-redis), dont le téléchargement exige d'être authentifié
+* Un compte Docker Hub (gratuit) et `docker login dhi.io` : Caddy, MariaDB et Redis utilisent les [Docker Hardened Images](#images-docker-hardened-images-caddy-mariadb-redis), dont le téléchargement exige d'être authentifié
 
 ### Installation Docker (Debian/Ubuntu)
 
@@ -497,20 +497,21 @@ docker compose exec caddy caddy reload --config /etc/caddy/Caddyfile
 
 Le banc de test `tests/caddy-waf/run.sh` vérifie le filtre IP, les blocages du WAF et le passage du trafic Nextcloud (WebDAV, CalDAV, OCS, gros uploads). Le relancer après toute modification du `Caddyfile` ou de la configuration Coraza.
 
-## Images Docker Hardened Images (MariaDB, Redis)
+## Images Docker Hardened Images (Caddy, MariaDB, Redis)
 
-MariaDB et Redis utilisent les [Docker Hardened Images](https://hub.docker.com/hardened-images/catalog) (`dhi.io/mariadb:11.8`, `dhi.io/redis:7`) : images minimales, sans gestionnaire de paquets, peu de CVE, avec SBOM et provenance signée. Le téléchargement exige `docker login dhi.io` avec un compte Docker Hub.
+Caddy, MariaDB et Redis utilisent les [Docker Hardened Images](https://hub.docker.com/hardened-images/catalog) (`dhi.io/caddy`, `dhi.io/mariadb:11.8`, `dhi.io/redis:7`) : images minimales, sans gestionnaire de paquets, peu de CVE, avec SBOM et provenance signée. Le téléchargement exige `docker login dhi.io` avec un compte Docker Hub.
 
 Elles ne se comportent pas comme les images officielles :
 
-* **Utilisateur nonroot (uid 65532)** : elles ne peuvent pas s'approprier leur répertoire de données. `scripts/prepare-data-dirs.sh` donne `db/` et `redis/` à cet uid (appelé par `install.sh`).
+* **Utilisateur nonroot (uid 65532)** : elles ne peuvent pas s'approprier leurs données. `scripts/prepare-data-dirs.sh` donne à cet uid `db/`, `redis/` et les volumes Caddy existants (appelé par `install.sh`).
 * **MariaDB ignore les arguments de `command`** : les options du serveur passent par `MARIADB_OPTIONS`.
 * **MariaDB ne crée que le compte root** : `MYSQL_DATABASE`, `MYSQL_USER` et `MYSQL_PASSWORD` sont ignorés. `scripts/init-mariadb.sh` crée la base et l'utilisateur (appelé par `install.sh`, idempotent).
 * **Redis n'a pas d'entrypoint** : `--protected-mode no` doit être passé explicitement, sinon les clients hors loopback sont refusés.
+* **Caddy n'inclut pas Coraza** : `caddy/Dockerfile` compile toujours le binaire avec xcaddy dans l'image officielle `caddy:*-builder`, puis le copie dans l'image DHI. Celle-ci n'a pas de shell (pas de `RUN`) et a `caddy` pour entrypoint : `docker run nextcloud-caddy-waf validate …`, et non `… caddy validate …`. `docker compose exec caddy caddy reload` fonctionne comme avant.
 
-Le banc de test `tests/db-redis/run.sh` vérifie une installation neuve et la reprise de données créées par les images officielles.
+Le banc de test `tests/db-redis/run.sh` vérifie une installation neuve et la reprise de données créées par les images officielles ; `tests/caddy-waf/run.sh` vérifie aussi que Caddy tourne en nonroot et écrit son log d'accès.
 
-### Migrer depuis les images officielles
+### Migrer MariaDB et Redis depuis les images officielles
 
 Les versions majeures sont identiques (MariaDB 11.8, Redis 7.4) : aucune conversion de données, seul le propriétaire des fichiers change (999 → 65532).
 
@@ -525,6 +526,19 @@ docker compose up -d
 ```
 
 Retour arrière : annuler le commit (`git revert`, qui remet aussi les options MariaDB dans `command`), puis `sudo chown -R 999:999 <DATA_PATH>/db <DATA_PATH>/redis` avant `docker compose up -d`.
+
+### Migrer Caddy depuis l'image officielle
+
+Les volumes `nextcloud_caddy_data` (certificats, logs) et `nextcloud_caddy_config` appartiennent à root : sans changement de propriétaire, Caddy DHI ne démarre pas. Les certificats existants sont repris tels quels, sans nouvelle demande à Let's Encrypt.
+
+```bash
+docker compose build --pull caddy
+docker compose stop caddy
+./scripts/prepare-data-dirs.sh "${DATA_PATH:-./data}"
+docker compose up -d caddy
+```
+
+Retour arrière : annuler le commit, `docker compose build caddy && docker compose up -d caddy`. L'image officielle tourne en root et lit les volumes quel que soit leur propriétaire.
 
 ## Mise à jour de Nextcloud
 

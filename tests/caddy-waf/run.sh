@@ -44,6 +44,11 @@ check "IPv4 refusee"           403 "$(http client-denied  "$V4" "$URL/status.php
 check "IPv6 autorisee"         200 "$(http client-allowed "$V6" "$URL/status.php")"
 check "IPv6 refusee"           403 "$(http client-denied  "$V6" "$URL/status.php")"
 check "ExApps IP refusee"      403 "$(http client-denied  "$V4" "$URL/exapps/app/")"
+check "conteneur backend"      200 "$(http client-backend 172.30.0.2 "$URL/status.php")"
+check "autre reseau prive"     403 "$(http client-autre-prive 10.99.0.2 "$URL/status.php")"
+# Depuis l'hote, la requete arrive avec l'IP de la passerelle backend
+check "passerelle backend"     403 "$(curl -sk -o /dev/null -w '%{http_code}' \
+    --resolve nc.localhost:443:172.30.0.2 "$URL/status.php")"
 
 echo "WAF"
 check "injection SQL"          403 "$(http client-allowed "$V4" "$URL/index.php?id=1%27%20OR%20%271%27=%271")"

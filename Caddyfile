@@ -5,10 +5,15 @@
     # Le bloc route impose l'ordre : filtre IP, ExApps, WAF, puis Nextcloud.
     route {
         # Filtre IP : seules les adresses de NEXTCLOUD_ALLOWED_IPS passent,
-        # plus les reseaux prives (conteneurs de la stack et ExApps qui
+        # plus le reseau backend (conteneurs de la stack et ExApps qui
         # appellent l'URL publique). Variable vide = acces externe ferme.
-        @hors_liste not remote_ip private_ranges {$NEXTCLOUD_ALLOWED_IPS}
+        @hors_liste not remote_ip {$NEXTCLOUD_BACKEND_SUBNET} {$NEXTCLOUD_ALLOWED_IPS}
         respond @hors_liste "Accès refusé" 403
+
+        # La passerelle du reseau backend n'est pas un conteneur : c'est
+        # l'hote, et le trafic relaye par docker-proxy y apparait.
+        @passerelle remote_ip {$NEXTCLOUD_BACKEND_GATEWAY}
+        respond @passerelle "Accès refusé" 403
 
         # Reverse proxy ExApps via HaRP (sans passer par PHP ni par le WAF)
         reverse_proxy /exapps/* appapi-harp:8780 {

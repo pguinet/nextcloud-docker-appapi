@@ -21,6 +21,9 @@ services:
       - NEXTCLOUD_DOMAIN=${NEXTCLOUD_DOMAIN}
       # IP/plages autorisees, separees par des espaces (voir .env.example)
       - NEXTCLOUD_ALLOWED_IPS=${NEXTCLOUD_ALLOWED_IPS:-}
+      # Seuls les conteneurs du reseau backend sont autorises d'office
+      - NEXTCLOUD_BACKEND_SUBNET=${NEXTCLOUD_BACKEND_SUBNET:-172.18.0.0/16}
+      - NEXTCLOUD_BACKEND_GATEWAY=${NEXTCLOUD_BACKEND_GATEWAY:-172.18.0.1}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - ./caddy/coraza:/etc/caddy/coraza:ro
@@ -194,3 +197,8 @@ networks:
     enable_ipv6: true
   backend:
     name: nextcloud_backend
+    # Sous-reseau fixe : le filtre IP de Caddy l'autorise explicitement
+    ipam:
+      config:
+        - subnet: ${NEXTCLOUD_BACKEND_SUBNET:-172.18.0.0/16}
+          gateway: ${NEXTCLOUD_BACKEND_GATEWAY:-172.18.0.1}

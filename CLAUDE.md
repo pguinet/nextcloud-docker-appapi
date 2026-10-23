@@ -92,7 +92,7 @@ docker compose exec -u www-data nextcloud php occ maintenance:mode --off
 | `scripts/install.sh` | Interactive initial setup |
 | `scripts/backup.sh` | Full backup automation |
 | `scripts/restore.sh` | Backup restoration |
-| `scripts/prepare-data-dirs.sh` | Chown `db/` and `redis/` to uid 65532 (DHI images run nonroot) |
+| `scripts/prepare-data-dirs.sh` | Chown `db/`, `redis/` and Caddy volumes to uid 65532 (DHI images run nonroot) |
 | `scripts/init-mariadb.sh` | Create Nextcloud DB + user (DHI MariaDB ignores `MYSQL_DATABASE`/`MYSQL_USER`) |
 
 ## Data Layout
@@ -124,15 +124,16 @@ docker compose exec -u www-data nextcloud php occ app_api:daemon:register \
   --set-default
 ```
 
-## Docker Hardened Images (MariaDB, Redis)
+## Docker Hardened Images (Caddy, MariaDB, Redis)
 
-`db` and `redis` use `dhi.io/mariadb:11.8` and `dhi.io/redis:7`; pulling needs `docker login dhi.io`. They differ from the official images:
-- run as uid 65532 → data dirs must be chowned (`scripts/prepare-data-dirs.sh`)
+`caddy`, `db` and `redis` use `dhi.io/caddy`, `dhi.io/mariadb:11.8` and `dhi.io/redis:7`; pulling needs `docker login dhi.io`. They differ from the official images:
+- run as uid 65532 → data dirs and Caddy volumes must be chowned (`scripts/prepare-data-dirs.sh`)
 - MariaDB ignores `command` args → server options go in `MARIADB_OPTIONS`
 - MariaDB only creates root → `scripts/init-mariadb.sh` creates the DB and user
 - Redis has no entrypoint → `--protected-mode no` must be explicit
+- DHI Caddy has no Coraza → `caddy/Dockerfile` builds with xcaddy in the official builder and copies the binary; the final image has no shell (no `RUN`) and `caddy` as entrypoint
 
-Test bench: `tests/db-redis/run.sh` (fresh install + migration from official images).
+Test benches: `tests/db-redis/run.sh` (fresh install + migration from official images), `tests/caddy-waf/run.sh`.
 
 ## Environment Variables
 

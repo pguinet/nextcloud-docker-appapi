@@ -56,12 +56,12 @@ check "passerelle backend"     403 "$(curl -sk -o /dev/null -w '%{http_code}' \
 
 echo "Configuration de prod"
 # Le Caddyfile doit aussi se charger avec la vraie liste UptimeRobot
-check "Caddyfile + vraie liste" 0 "$(docker run --rm -e NEXTCLOUD_DOMAIN=nc.localhost \
+check "Caddyfile + vraie liste" 0 "$(docker run --rm --entrypoint caddy -e NEXTCLOUD_DOMAIN=nc.localhost \
     -e NEXTCLOUD_BACKEND_SUBNET=172.18.0.0/16 -e NEXTCLOUD_BACKEND_GATEWAY=172.18.0.1 \
     -v "$PWD/../../Caddyfile:/etc/caddy/Caddyfile:ro" \
     -v "$PWD/../../caddy/coraza:/etc/caddy/coraza:ro" \
     -v "$PWD/../../caddy/uptimerobot-ips.caddy:/etc/caddy/uptimerobot-ips.caddy:ro" \
-    nextcloud-caddy-waf caddy validate --config /etc/caddy/Caddyfile >/dev/null 2>&1; echo $?)"
+    nextcloud-caddy-waf validate --config /etc/caddy/Caddyfile >/dev/null 2>&1; echo $?)"
 
 echo "WAF"
 check "injection SQL"          403 "$(http client-allowed "$V4" "$URL/index.php?id=1%27%20OR%20%271%27=%271")"
@@ -94,6 +94,14 @@ check "PUT 50 Mo"              200 "$("${COMPOSE[@]}" exec -T client-allowed sh 
 check "redirection CalDAV"     301 "$(http client-allowed "$V4" "$URL/.well-known/caldav")"
 check "fichier sensible"       404 "$(http client-allowed "$V4" "$URL/occ")"
 check "ExApps hors WAF"        200 "$(http client-allowed "$V4" "$URL/exapps/app/?id=1%27%20OR%20%271%27=%271")"
+
+echo "Image"
+CADDY_ID=$("${COMPOSE[@]}" ps -q caddy)
+check "Caddy en nonroot"       65532 "$(docker inspect -f '{{.Config.User}}' "$CADDY_ID")"
+check "module Coraza"          1 "$("${COMPOSE[@]}" exec -T caddy caddy list-modules 2>/dev/null | grep -c '^http.handlers.waf$')"
+# Le log d'acces est ecrit dans le volume caddy_data : verifie les droits de /data/logs
+check "log d'acces ecrit"      0 "$("${COMPOSE[@]}" cp caddy:/data/logs/nextcloud.log - 2>/dev/null \
+    | tar -xO | grep status.php >/dev/null; echo $?)"
 
 echo
 if [ "$FAILURES" -eq 0 ]; then

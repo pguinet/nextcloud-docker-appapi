@@ -19,6 +19,9 @@ services:
       - ../../caddy/coraza:/etc/caddy/coraza:ro
       # client-sonde joue le role d'une sonde UptimeRobot
       - ./uptimerobot-ips.caddy:/etc/caddy/uptimerobot-ips.caddy:ro
+      # Volumes nommes neufs, comme en prod : certificats et /data/logs
+      - caddy_data:/data
+      - caddy_config:/config
     networks:
       internet:
         ipv4_address: 198.51.100.2
@@ -90,3 +93,7 @@ networks:
       config:
         - subnet: 10.99.0.0/24
           ip_range: 10.99.0.128/25
+
+volumes:
+  caddy_data:
+  caddy_config:

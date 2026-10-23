@@ -14,6 +14,8 @@ OFFICIAL_DB=mariadb:11.8
 DB_PASSWORD="te'st"
 OFFICIAL_REDIS=redis:7-alpine
 ROOT=$(mktemp -d)
+# Ne pas toucher aux volumes Caddy de la machine (cf. prepare-data-dirs.sh)
+export CADDY_VOLUMES=
 
 cleanup() {
     "${COMPOSE[@]}" down -v --remove-orphans >/dev/null 2>&1

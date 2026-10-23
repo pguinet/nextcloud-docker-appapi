@@ -29,7 +29,7 @@ Stack Docker complète pour déployer Nextcloud avec support AppAPI (ExApps) sur
 
 | Service | Image | Rôle |
 | --- | --- | --- |
-| Caddy | `caddy:2-alpine` | Reverse proxy avec SSL automatique |
+| Caddy | `caddy/Dockerfile` (Caddy + Coraza) | Reverse proxy avec SSL automatique, filtre IP et WAF |
 | Nextcloud | `nextcloud:32-apache` | Application principale |
 | PostgreSQL | `postgres:16-alpine` | Base de données |
 | Redis | `redis:7-alpine` | Cache et file locking |
@@ -446,6 +446,45 @@ docker exec -u www-data nextcloud-app php occ memories:index
 * Caddy gère automatiquement les certificats SSL
 * Les mots de passe sont dans `.env` (non versionné)
 * Le réseau `backend` isole les services internes
+
+### Filtre IP
+
+Caddy n'accepte que les adresses listées dans `NEXTCLOUD_ALLOWED_IPS` (fichier `.env`), séparées par des espaces, en IPv4 comme en IPv6 :
+
+```bash
+NEXTCLOUD_ALLOWED_IPS=203.0.113.10 2001:db8:1234:5600::/56
+```
+
+Les réseaux privés restent toujours autorisés : Nextcloud et les ExApps appellent l'URL publique, et un alias réseau sur `backend` les envoie directement vers Caddy. Toute autre adresse reçoit un `403`, y compris sur `/exapps/*`. Sans variable, plus rien n'est joignable depuis Internet. Les challenges Let's Encrypt ne sont pas concernés.
+
+Le réseau `frontend` a l'IPv6 activé : sans lui, les clients IPv6 passent par `docker-proxy` et Caddy ne voit que l'IP de la passerelle Docker, ce qui fausse le filtre.
+
+Après modification de `.env` : `docker compose up -d caddy`.
+
+### WAF (Coraza + OWASP CRS)
+
+Caddy embarque le WAF [Coraza](https://coraza.io/) avec l'[OWASP Core Rule Set](https://coreruleset.org/) et le [plugin d'exclusions Nextcloud](https://github.com/coreruleset/nextcloud-rule-exclusions-plugin), en mode bloquant (paranoia level 1).
+
+* Le corps des uploads WebDAV n'est pas inspecté (fichiers jusqu'à `PHP_UPLOAD_LIMIT`) ; l'URL et les en-têtes le sont.
+* Les autres requêtes sont limitées à 12,5 Mo de corps.
+* `/exapps/*` (HaRP) ne passe pas par le WAF.
+* Les réglages locaux sont dans `caddy/coraza/nextcloud.conf`, monté en lecture seule.
+
+Les versions de Caddy, du module Coraza et du plugin sont épinglées dans `caddy/Dockerfile`. Pour les mettre à jour : `docker compose build --pull caddy && docker compose up -d caddy`.
+
+Les blocages apparaissent dans les logs de Caddy :
+
+```bash
+docker compose logs caddy | grep -E 'Access denied|rule violation'
+```
+
+En cas de faux positif, repérer le `unique_id` de la requête, retrouver les règles déclenchées (`grep <unique_id>`), puis ajouter une exclusion ciblée dans `caddy/coraza/nextcloud.conf` (par exemple `ctl:ruleRemoveTargetById` limité à une URL) et recharger :
+
+```bash
+docker compose exec caddy caddy reload --config /etc/caddy/Caddyfile
+```
+
+Le banc de test `tests/caddy-waf/run.sh` vérifie le filtre IP, les blocages du WAF et le passage du trafic Nextcloud (WebDAV, CalDAV, OCS, gros uploads). Le relancer après toute modification du `Caddyfile` ou de la configuration Coraza.
 
 ## Mise à jour de Nextcloud
 

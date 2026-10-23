@@ -1,24 +1,41 @@
 services:
   # ===========================================
-  # Reverse Proxy - SSL automatique
+  # Reverse Proxy - SSL automatique + WAF Coraza
   # ===========================================
   caddy:
-    image: caddy:2-alpine
+    build: ./caddy
+    image: nextcloud-caddy-waf
     container_name: nextcloud-caddy
     restart: unless-stopped
+    # Le WAF journalise chaque regle declenchee : plafonner les logs Docker
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
     ports:
       - "80:80"
       - "443:443"
       - "443:443/udp"  # HTTP/3
     environment:
       - NEXTCLOUD_DOMAIN=${NEXTCLOUD_DOMAIN}
+      # IP/plages autorisees, separees par des espaces (voir .env.example)
+      - NEXTCLOUD_ALLOWED_IPS=${NEXTCLOUD_ALLOWED_IPS:-}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./caddy/coraza:/etc/caddy/coraza:ro
       - caddy_data:/data
       - caddy_config:/config
     networks:
-      - frontend
-      - backend
+      frontend:
+        # Reseau de sortie prioritaire : les ports publies arrivent par lui,
+        # en IPv4 comme en IPv6, avec la vraie IP du client.
+        gw_priority: 1
+      backend:
+        # Les conteneurs qui appellent l'URL publique (Nextcloud, ExApps)
+        # joignent Caddy directement, sans repasser par l'IP publique.
+        aliases:
+          - ${NEXTCLOUD_DOMAIN}
     depends_on:
       - nextcloud
 
@@ -156,5 +173,8 @@ volumes:
 networks:
   frontend:
     name: nextcloud_frontend
+    # Sans IPv6 sur ce reseau, les clients IPv6 passent par docker-proxy et
+    # Caddy ne voit que l'IP de la passerelle : le filtre IP serait faux.
+    enable_ipv6: true
   backend:
     name: nextcloud_backend

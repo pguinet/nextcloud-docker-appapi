@@ -2,15 +2,60 @@
 # SSL automatique via Let's Encrypt
 
 {$NEXTCLOUD_DOMAIN} {
-    # Reverse proxy ExApps via HaRP (sans passer par PHP)
-    reverse_proxy /exapps/* appapi-harp:8780 {
-        transport http {
-            read_timeout 1800s
-        }
-    }
+    # Le bloc route impose l'ordre : filtre IP, ExApps, WAF, puis Nextcloud.
+    route {
+        # Filtre IP : seules les adresses de NEXTCLOUD_ALLOWED_IPS passent,
+        # plus les reseaux prives (conteneurs de la stack et ExApps qui
+        # appellent l'URL publique). Variable vide = acces externe ferme.
+        @hors_liste not remote_ip private_ranges {$NEXTCLOUD_ALLOWED_IPS}
+        respond @hors_liste "Accès refusé" 403
 
-    # Reverse proxy vers Nextcloud
-    reverse_proxy nextcloud:80
+        # Reverse proxy ExApps via HaRP (sans passer par PHP ni par le WAF)
+        reverse_proxy /exapps/* appapi-harp:8780 {
+            transport http {
+                read_timeout 1800s
+            }
+        }
+
+        # WAF Coraza + OWASP CRS, avec le plugin d'exclusions Nextcloud.
+        # Reglages locaux et exclusions : caddy/coraza/nextcloud.conf
+        coraza_waf {
+            load_owasp_crs
+            directives `
+                Include @coraza.conf-recommended
+                Include /etc/caddy/coraza/nextcloud.conf
+                Include @crs-setup.conf.example
+                Include /etc/caddy/crs-plugins/nextcloud-rule-exclusions-config.conf
+                Include /etc/caddy/crs-plugins/nextcloud-rule-exclusions-before.conf
+                Include @owasp_crs/*.conf
+            `
+        }
+
+        # Redirections WebDAV/CalDAV/CardDAV
+        redir /.well-known/carddav /remote.php/dav/ 301
+        redir /.well-known/caldav /remote.php/dav/ 301
+        redir /.well-known/webfinger /index.php/.well-known/webfinger 301
+        redir /.well-known/nodeinfo /index.php/.well-known/nodeinfo 301
+
+        # Bloquer l'accès aux fichiers sensibles
+        @forbidden {
+            path /.htaccess
+            path /data/*
+            path /config/*
+            path /db_structure
+            path /.xml
+            path /README
+            path /3rdparty/*
+            path /lib/*
+            path /templates/*
+            path /occ
+            path /console.php
+        }
+        respond @forbidden 404
+
+        # Reverse proxy vers Nextcloud
+        reverse_proxy nextcloud:80
+    }
 
     # Headers de sécurité
     header {
@@ -22,28 +67,6 @@
         # Supprimer le header Server
         -Server
     }
-
-    # Redirections WebDAV/CalDAV/CardDAV
-    redir /.well-known/carddav /remote.php/dav/ 301
-    redir /.well-known/caldav /remote.php/dav/ 301
-    redir /.well-known/webfinger /index.php/.well-known/webfinger 301
-    redir /.well-known/nodeinfo /index.php/.well-known/nodeinfo 301
-
-    # Bloquer l'accès aux fichiers sensibles
-    @forbidden {
-        path /.htaccess
-        path /data/*
-        path /config/*
-        path /db_structure
-        path /.xml
-        path /README
-        path /3rdparty/*
-        path /lib/*
-        path /templates/*
-        path /occ
-        path /console.php
-    }
-    respond @forbidden 404
 
     # Compression
     encode gzip zstd

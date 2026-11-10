@@ -3,7 +3,10 @@ ARG CADDY_VERSION=2.11.9
 
 FROM caddy:${CADDY_VERSION}-builder AS builder
 ARG CORAZA_CADDY_VERSION=v2.6.2
-RUN xcaddy build --with github.com/corazawaf/coraza-caddy/v2@${CORAZA_CADDY_VERSION}
+# Dependances forcees au-dela de celles de Caddy pour des correctifs de securite (CVE-2026-78661)
+ARG X_NET_VERSION=v0.62.0
+RUN xcaddy build --with github.com/corazawaf/coraza-caddy/v2@${CORAZA_CADDY_VERSION} \
+    --replace golang.org/x/net=golang.org/x/net@${X_NET_VERSION}
 
 # Plugin CRS d'exclusions Nextcloud : evite les faux positifs WebDAV, CalDAV, editeur...
 # https://github.com/coreruleset/nextcloud-rule-exclusions-plugin

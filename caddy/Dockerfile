@@ -1,5 +1,5 @@
 # Caddy avec le WAF Coraza (OWASP CRS embarque dans le module)
-ARG CADDY_VERSION=2.11.7
+ARG CADDY_VERSION=2.11.9
 
 FROM caddy:${CADDY_VERSION}-builder AS builder
 ARG CORAZA_CADDY_VERSION=v2.6.2
